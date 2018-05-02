@@ -6,7 +6,6 @@ from PIL import Image, ImageTk
 from BD import Database# as database
 import mysql.connector.errors
 import sys
-import os
 
 database = Database()
 
@@ -16,7 +15,8 @@ SMALL_FONT = ("verdana", 8)
 
 def path_finder(entry):
 	entry.delete(0,tk.END)
-	filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file",filetypes = (("jpeg files","*.jpg"),("jpeg files","*.png"),("all files","*.*")))
+	filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file",filetypes = (("jpeg files","*.jpg"),("png files","*.png"),("gif files","*.gif"), ("all files","*.*")))
+	# filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file",filetypes = (("all files","*.*")))
 	entry.insert(0, filename)
 
 def popupmsg(msg):
@@ -35,6 +35,17 @@ def sim_nao(param):
 		return "S"
 	else:
 		return "N"
+
+def delete_entries(entries):
+	try:
+		for item in entries:
+			if type(item) == tk.ttk.Entry:
+				item.delete(0,tk.END)
+			else:
+				item.set('')
+	except TypeError as e:
+		pass
+
 
 def delete_listbox(listbox):
 	x = listbox.get_children()
@@ -65,7 +76,7 @@ def fill_listbox(listbox, values, flag = False):
 		elif isinstance(values, str):
 			listbox.insert('','end',values=('0',values.upper()))
 
-def cmd_add(listbox = None, nome = None, autor = None, capa = None, 
+def cmd_add(listbox = None, entries = None, nome = None, autor = None, capa = None, 
 			quantidade = None, combo_lido = None, 
 			combo_tenho = None, genero = None, 
 			midia = None, table = None):
@@ -87,6 +98,8 @@ def cmd_add(listbox = None, nome = None, autor = None, capa = None,
 
 	delete_listbox(listbox)
 	fill_listbox(listbox, write)
+
+	delete_entries(entries)
 
 	popupmsg("Cadastro realizado com sucesso!")
 
@@ -116,12 +129,6 @@ def cmd_search_all(listbox, where, like, tabela):
 
 def cmd_update(listbox, nome, autor, capa, quantidade, 
 			combo_lido, combo_tenho, genero, midia):
-	# transforma a saída em S ou N necessário no DB
-	# def sim_nao(param):
-	# 	if param == "Sim":
-	# 		return "S"
-	# 	else:
-	# 		return "N"
 
 	def selectItem(listbox):
 		curItem = listbox.focus()
@@ -156,13 +163,11 @@ def cmd_update_one(listbox, alteracao, tabela = None):
 	old = []
 
 	if tabela == "AUTOR":
-		# print(listbox.item(curItem).get('values'))
 		old.append(listbox.item(curItem).get('values')[0]) # SALVA INDICE DO AUTOR ANTIGO
 		old.append(listbox.item(curItem).get('values')[1]) # SALVA NOME DO AUTOR ANTIGO
 		old.append(listbox.item(curItem).get('values')[2]) # SALVA NOME DO LIVRO QUE TERÁ SEU AUTOR ALTERADO
 
 	elif tabela == "CATEGORIA":
-		# print(listbox.item(curItem).get('values'))
 		old.append(listbox.item(curItem).get('values')[0]) # SALVA INDICE DO GENERO ANTIGO
 		old.append(listbox.item(curItem).get('values')[1]) # SALVA NOME DA CATEGORIA ANTIGA
 		old.append(listbox.item(curItem).get('values')[2]) # SALVA NOME DO LIVRO QUE TERÁ SUA CATEGORIA ALTERADA
@@ -175,7 +180,7 @@ def cmd_update_one(listbox, alteracao, tabela = None):
 			listbox.delete(child)
 	listbox.insert('','end',values=('0',alteracao.upper()))
 
-def cmd_delete(listbox, tabela, param_id, param):
+def cmd_delete(listbox, entries, tabela, param_id, param):
 
 	curItem = listbox.focus()
 
@@ -203,6 +208,8 @@ def cmd_delete(listbox, tabela, param_id, param):
 	elif tabela == "CATEGORIA":
 		delete_listbox(listbox)
 		fill_listbox(listbox ,nome)
+
+	delete_entries(entries)
 	popupmsg("Item apagado com sucesso!")
 
 def quit():
@@ -215,11 +222,7 @@ class mainApp(tk.Tk):
 
 		img = Image.open (r".\img\icone.ico")
 		icon = ImageTk.PhotoImage(img)
-		self.tk.call('wm', 'iconphoto', self._w, icon)
-
-		# icon = tk.PhotoImage(file=r'icone.ico')
-		# icon.image = icon
-		# self.tk.call('wm', 'iconphoto', self._w, icon)	
+		self.tk.call('wm', 'iconphoto', self._w, icon)	
 		
 		tk.Tk.wm_title(self, "Biblioteca")
 		container = tk.Frame(self)
@@ -275,6 +278,70 @@ class StartPage(tk.Frame):
 		label.image = photo
 		label_photo.pack()
 
+def basicListboxScroll(self, gridList, spanList, gridScroll, spanScroll, columnName, text, img = None):
+
+	listbox = ttk.Treeview(self)
+	listbox.grid(column = gridList[0], row = gridList[1],
+				columnspan = spanList[0], rowspan = spanList[1], sticky=tk.W+tk.E+tk.N+tk.S)
+	listbox['columns'] = columnName
+
+	def basicColumn(text = None, stretch = None, width = None, columnName = None):		
+		
+		listbox.heading("#0", text='Id')
+		listbox.column("#0", stretch=tk.NO, width=0)
+
+		for i, column in enumerate(columnName):
+			if i == 0 or i > 4:
+				listbox.heading(columnName[i], text = text[i])
+				listbox.column(columnName[i], stretch = tk.NO, width = 70)
+			elif i == 1:
+				listbox.heading(columnName[i], text = text[i])
+				listbox.column(columnName[i], stretch = tk.NO, width = 330)
+			else:
+				listbox.heading(columnName[i], text = text[i])
+				listbox.column(columnName[i], stretch = tk.NO, width = 150)
+
+
+	basicColumn(text = text, columnName = columnName)
+	scroll = ttk.Scrollbar(self)
+	scroll.grid(column = gridScroll[0], row = gridScroll[1], rowspan = spanScroll, sticky=tk.N+tk.S)
+
+	listbox.configure(yscrollcommand = scroll.set)
+	scroll.configure(command = listbox.yview)
+
+	return listbox
+
+def basicButton(self, text, grid, pressCommand, width = None, sticky = None):
+	button = ttk.Button(self, text = text, 
+							command = pressCommand, width = width)
+	button.grid(column = grid[0], row = grid[1], sticky = sticky)
+
+def manyButtons(self, frame, nameList, gridList, commandList, widthList, stickyList):
+	for i in range(len(nameList)):
+		basicButton(self, nameList[i], gridList[i], commandList[i], widthList[i], stickyList[i])
+
+def basicCombobox(self, values, grid):
+	box = tk.StringVar()
+	combobox = ttk.Combobox(self, textvariable = box, state="readonly", width = 17)
+	combobox['values'] = values
+	combobox.grid(column = grid[0], row = grid[1])
+
+	return combobox
+
+def basicLabel(self, text, font, grid):
+	label = ttk.Label(self, text = text, font = font)
+	label.grid(column  = grid[0], row = grid[1])	
+
+def manyLabels(self, frame, nameList, fontList, gridList):
+	for i in range(len(nameList)):
+		basicLabel(self, nameList[i], fontList[i], gridList[i])	
+
+def basicEntry(self, grid):
+	entry = ttk.Entry(self)
+	entry.grid(column  = grid[0], row = grid[1])
+
+	return entry
+
 class searchBook(tk.Frame):
 
 	def __init__(self, parent, controller):
@@ -282,9 +349,11 @@ class searchBook(tk.Frame):
 		def get_selected_row(event,img):
 			try:
 				global tupla_escolhida
+
 				indice=listbox.selection()[0]
+				# recebendo os valores recebidos com o clique na listbox
 				tupla_escolhida=listbox.item(listbox.selection()[0])['values']
-				
+
 				entryNome.delete(0,tk.END)
 				entryNome.insert(tk.END,tupla_escolhida[1])
 				entryAutor.delete(0,tk.END)
@@ -299,23 +368,20 @@ class searchBook(tk.Frame):
 
 				cover = database.search_cover(tupla_escolhida[1])
 				cover = cover[0][0]
-				img = cover
-
+				img = cover			
 				entryCapa.delete(0,tk.END)
 				entryCapa.insert(tk.END,cover)
 				
 				label = tk.Label(self, text = 'Start Page', font = LARGE_FONT)
 
 				try:
-					# entryCapa.delete(0,tk.END)
 					img = Image.open (cover)
 					img = img.resize ((200, 291))
 					photo = ImageTk.PhotoImage(img)
 					label_photo = ttk.Label(self, image = photo)
 					label.image = photo
 					label_photo.grid(column = 7, row = 1, rowspan = 1000, columnspan = 1000)
-				except FileNotFoundError as err:
-					# entryCapa.delete(0,tk.END)
+				except (FileNotFoundError, AttributeError) as err:
 					img = Image.open (r".\capas\SEM-IMAGEM.jpg")
 					img = img.resize ((200, 291))
 					photo = ImageTk.PhotoImage(img)
@@ -327,315 +393,158 @@ class searchBook(tk.Frame):
 				pass
 
 		tk.Frame.__init__(self, parent)
-		label1 = ttk.Label(self, text = 'Procurar Livro', font = LARGE_FONT)
-		label1.grid(column  = 0, row = 0)
 
-		labelNome = ttk.Label(self, text = 'Livro', font = LARGE_FONT)
-		labelNome.grid(column  = 0, row = 1)
+		nameList = ['Procurar Livro', "livro", "Autor", "Gênero", "Mídia", "Quantidade", "Lido", "Possuo", "Capa"]
+		fontList = [LARGE_FONT, LARGE_FONT, LARGE_FONT, LARGE_FONT, LARGE_FONT, LARGE_FONT, LARGE_FONT, LARGE_FONT, LARGE_FONT]
+		gridList = [[0,0], [0,1], [2,1], [4,1], [0,2], [2,2], [4,2], [0,3], [2,3]]
+		manyLabels(self, "searchBook", nameList, fontList, gridList)
 
-		entryNome = ttk.Entry(self)
-		entryNome.grid(column  = 1, row = 1)
+		entryNome = basicEntry(self, [1,1])
 
-		labelAutor = ttk.Label(self, text = 'Autor', font = LARGE_FONT)
-		labelAutor.grid(column  = 2, row = 1)
+		entryAutor = basicEntry(self, [3,1])
 
-		entryAutor = ttk.Entry(self)
-		entryAutor.grid(column  = 3, row = 1)
+		entryGenero = basicEntry(self, [5,1])
 
-		labelGenero = ttk.Label(self, text = 'Gênero', font = LARGE_FONT)
-		labelGenero.grid(column  = 4, row = 1)
+		values = ['AUDIOBOOK', 'EBOOK', 'FÍSICO']
+		combobox_midia = basicCombobox(self, values, [1,2])
 
-		entryGenero = ttk.Entry(self)
-		entryGenero.grid(column  = 5, row = 1)
+		entryQuantidade = basicEntry(self, [3,2])
 
-		labelMidia = ttk.Label(self, text = 'Mídia', font = LARGE_FONT)
-		labelMidia.grid(column  = 0, row = 2)
+		values = ['Sim', 'Não']
+		combobox_read = basicCombobox(self, values, [5,2])
 
-		box_midia_value = tk.StringVar()
-		combobox_midia = ttk.Combobox(self, textvariable = box_midia_value, state="readonly", width = 17)
-		combobox_midia['values'] = ('AUDIOBOOK', 'EBOOK', 'FÍSICO')
-		combobox_midia.grid(column = 1, row = 2)
+		values = ['Sim', 'Não']
+		combobox_own = basicCombobox(self, values, [1,3])
 
-		labelQuantidade = ttk.Label(self, text = 'Quantidade', font = LARGE_FONT)
-		labelQuantidade.grid(column  = 2, row = 2)
+		entryCapa = basicEntry(self, [3,3])
 
-		entryQuantidade = ttk.Entry(self)
-		entryQuantidade.grid(column  = 3, row = 2)
+		entries = [entryNome, entryAutor, entryGenero, entryQuantidade, entryCapa, 
+					combobox_midia, combobox_read, combobox_own]
 
-		labelLido = ttk.Label(self, text = 'Lido', font = LARGE_FONT)
-		labelLido.grid(column  = 4, row = 2)
-
-		box_read_value = tk.StringVar()
-		combobox_read = ttk.Combobox(self, textvariable = box_read_value, state="readonly", width = 17)
-		combobox_read['values'] = ('Sim', 'Não')
-		combobox_read.grid(column = 5, row = 2)
-
-		labelPossuo = ttk.Label(self, text = 'Possuo', font = LARGE_FONT)
-		labelPossuo.grid(column  = 0, row = 3)
-
-		box_own_value = tk.StringVar()
-		combobox_own = ttk.Combobox(self, textvariable = box_own_value, state="readonly", width = 17)
-		combobox_own['values'] = ('Sim', 'Não')
-
-		combobox_own.grid(column = 1, row = 3)
-
-		labelCapa = ttk.Label(self, text = 'Capa', font = LARGE_FONT)
-		labelCapa.grid(column  = 2, row = 3)
-
-		entryCapa = ttk.Entry(self)
-		entryCapa.grid(column  = 3, row = 3)
-
-		buttonPath = ttk.Button(self, text = "...", 
-								command = lambda: path_finder(entryCapa), 
-								width = 4)
-		buttonPath.grid(column = 4, row = 3, sticky = tk.W)
-
-		buttonBook = ttk.Button(self, text = "Procurar livro", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "L.NOME", like = entryNome.get(), tabela = "LIVRO"))
-		buttonBook.grid(column = 0, row = 7)	
-
-		buttonAll = ttk.Button(self, text = "Ver todos", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "L.NOME", like = "", tabela = "LIVRO"))
-		buttonAll.grid(column = 1, row = 7)
-
-		buttonUpdate = ttk.Button(self, text = "Alterar cadastro", 
-								command = lambda: cmd_update(listbox = listbox,
+		nameList = ["...", "Procurar livro", "Ver todos", "Alterar cadastro", "Deletar", "Cadastrar", "Limpar campos"]
+		gridList = [[4,3], [0,7], [1,7], [2,7], [3,7], [4,7], [5,3]]
+		commandList = [lambda: path_finder(entryCapa), 
+						lambda: cmd_search_all(listbox = listbox, 
+								where = "L.NOME", like = entryNome.get(), tabela = "LIVRO"), 
+						lambda: cmd_search_all(listbox = listbox, 
+								where = "L.NOME", like = "", tabela = "LIVRO"), 
+						lambda: cmd_update(listbox = listbox,
 								nome = entryNome.get(), autor = entryAutor.get(), 
 								capa = entryCapa.get(), quantidade = entryQuantidade.get(),
 								combo_lido = combobox_read.get(), combo_tenho = combobox_own.get(),
-								genero = entryGenero.get(), midia = combobox_midia.get()))
-		buttonUpdate.grid(column = 2, row = 7)
-
-		buttonDelete = ttk.Button(self, text = "Deletar", 
-								command = lambda: cmd_delete(listbox = listbox,
-								tabela = "LIVRO", param_id = "IDLIVRO", param = "NOME"))
-		buttonDelete.grid(column = 3, row = 7)
-
-		# nome, autor, capa, quantidade, combo_lido, combo_tenho
-		buttonAdd = ttk.Button(self, text = "Cadastrar", 
-								command = lambda: cmd_add(listbox,
+								genero = entryGenero.get(), midia = combobox_midia.get()), 
+						lambda: cmd_delete(listbox = listbox, entries = entries,
+								tabela = "LIVRO", param_id = "IDLIVRO", param = "NOME"), 
+						lambda: cmd_add(listbox, entries,
 								entryNome.get(), entryAutor.get(), 
 								entryCapa.get(), entryQuantidade.get(),
 								combobox_read.get(), combobox_own.get(),
 								entryGenero.get(), combobox_midia.get(),
-								table = "LIVRO"))
-		buttonAdd.grid(column = 4, row = 7)	
+								table = "LIVRO"),
+						lambda: delete_entries(entries)]
+
+		widthList = [4, 0, 0, 0, 0, 0, 0]
+		stickyList = [tk.W, None, None, None, None, None, None]
+
+		manyButtons(self, "searchBook", nameList, gridList, commandList, widthList, stickyList)
 
 		img = "livros.gif"
 
-		listbox = ttk.Treeview(self)
-		listbox.grid(row=4,column=0,rowspan=3,columnspan=6,sticky=tk.W+tk.E+tk.N+tk.S)
-		
-		#L.IDLIVRO, L.NOME, A.NOME,C.CATEGORIA, T.TIPO, L.QUANTIDADE
-		listbox['columns'] = ('id','Nome', 'Autor', 'Genero', 'Tipo', 'Tenho', 'Lido', 'Quantidade')
+		columnName = ()
+		columnName = ('id','Nome', 'Autor', 'Genero', 'Tipo', 'Tenho', 'Lido', 'Quantidade')
+		text = ['ID Livro', 'Nome do livro', 'Autor', 'Gênero', 'Mídia', 'Tenho', 'Lido', 'Quantidade']
 
-		listbox.heading("#0", text='Id')
-		listbox.column("#0", stretch=tk.NO, width=0)
-
-		listbox.heading("id", text='ID Livro')
-		listbox.column("id", stretch=tk.NO, width=70)
-
-		listbox.heading('Nome', text='Nome do livro')
-		listbox.column("Nome", stretch=tk.NO, width=300)
-
-		listbox.heading('Autor', text='Autor')
-		listbox.column("Autor", stretch=tk.NO, width=120)
-
-		listbox.heading('Genero', text='Gênero')
-		listbox.column("Genero", stretch=tk.NO, width=120)
-
-		listbox.heading('Tipo', text='Mídia')
-		listbox.column("Tipo", stretch=tk.NO, width=120)
-
-		listbox.heading('Tenho', text='Tenho')
-		listbox.column("Tenho", stretch=tk.NO, width=70)
-
-		listbox.heading('Lido', text='Lido')
-		listbox.column("Lido", stretch=tk.NO, width=70)
-
-		listbox.heading('Quantidade', text='Quantidade')
-		listbox.column("Quantidade", stretch=tk.NO, width=70)
+		listbox = basicListboxScroll(self, [0,4], [6,3], [6,4], 3, columnName, text, img)
 
 		listbox.bind('<<TreeviewSelect>>',lambda event, img = img: 
 			get_selected_row(event, img))
 
-		scroll = ttk.Scrollbar(self)
-		scroll.grid(row=4,column=6,rowspan=3, sticky=tk.N+tk.S)
-
-		listbox.configure(yscrollcommand=scroll.set)
-		scroll.configure(command=listbox.yview)
-
-
 class searchAuthor(tk.Frame):
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
-		label = ttk.Label(self, text = 'Author', font = LARGE_FONT)
-		label.grid(column  = 0, row = 0)
 
-		entry = ttk.Entry(self)
-		entry.grid(column  = 1, row = 0)
+		basicLabel(self, "Autor", LARGE_FONT, [0,0])
 
-		buttonBook = ttk.Button(self, text = "Procurar autor", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "A.NOME", like = entry.get(), tabela = "AUTOR"))
-		buttonBook.grid(column = 0, row = 7)	
+		entry = basicEntry(self, [1,0])
 
-		buttonAll = ttk.Button(self, text = "Ver todos", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "A.NOME", like = "", tabela = "AUTOR"))
-		buttonAll.grid(column = 1, row = 7)
+		nameList = ["Procurar autor", "Ver todos", "Alterar cadastro", "Deletar", "Cadastrar"]
+		gridList = [[0,7], [1,7], [2,7], [3,7], [4,7]]
+		commandList = [lambda: cmd_search_all(listbox = listbox, 
+								where = "A.NOME", like = entry.get(), tabela = "AUTOR"), 
+						lambda: cmd_search_all(listbox = listbox, 
+								where = "A.NOME", like = "", tabela = "AUTOR"), 
+						lambda: cmd_update_one(listbox = listbox,
+								alteracao = entry.get(), tabela = "AUTOR"), 
+						lambda: cmd_delete(listbox = listbox, entries = None,
+								tabela = "AUTOR", param_id = "IDAUTOR", param = "NOME"), 
+						lambda: cmd_add(listbox  = listbox, nome = entry.get().upper(), table = "AUTOR")]
 
-		buttonUpdate = ttk.Button(self, text = "Alterar cadastro", 
-								command = lambda: cmd_update_one(listbox = listbox,
-								alteracao = entry.get(), tabela = "AUTOR"))
-		buttonUpdate.grid(column = 2, row = 7)
+		widthList = [0, 0, 0, 0, 0]
+		stickyList = [None, None, None, None, None]
 
-		buttonDelete = ttk.Button(self, text = "Deletar", 
-								command = lambda: cmd_delete(listbox = listbox,
-								tabela = "AUTOR", param_id = "IDAUTOR", param = "NOME"))
-		buttonDelete.grid(column = 3, row = 7)
+		manyButtons(self, "searchAuthor", nameList, gridList, commandList, widthList, stickyList)
 
-		buttonAdd = ttk.Button(self, text = "Adiciona Autor", 
-								command = lambda: cmd_add(listbox  = listbox, nome = entry.get().upper(), table = "AUTOR"))
-		buttonAdd.grid(column = 4, row = 7)
+		columnName = ()
+		columnName = ('id','Autor', 'Nome', 'Genero')
+		text = ['ID Livro', 'Autor', 'Nome', 'Gênero']
 
-		listbox = ttk.Treeview(self)
-		listbox.grid(row=4,column=0,rowspan=3,columnspan=100,sticky=tk.W+tk.E+tk.N+tk.S)
-
-		listbox['columns'] = ('id','Autor', 'Nome', 'Genero')
-
-		listbox.heading("#0", text='Id')
-		listbox.column("#0", stretch=tk.NO, width=0)
-
-		listbox.heading("id", text='ID Livro')
-		listbox.column("id", stretch=tk.NO, width=70)
-
-		listbox.heading('Nome', text='Nome do livro')
-		listbox.column("Nome", stretch=tk.NO, width=300)
-
-		listbox.heading('Autor', text='Autor')
-		listbox.column("Autor", stretch=tk.NO, width=120)
-
-		listbox.heading('Genero', text='Gênero')
-		listbox.column("Genero", stretch=tk.NO, width=120)
-
-		scroll = ttk.Scrollbar(self)
-		scroll.grid(row=4,column=101,rowspan=3, sticky=tk.N+tk.S)
-
-		listbox.configure(yscrollcommand=scroll.set)
-		scroll.configure(command=listbox.yview)
+		listbox = basicListboxScroll(self, [0,4], [6,3], [6,4], 3, columnName, text)
 
 class searchGenre(tk.Frame):
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
-		label = ttk.Label(self, text = 'Genre', font = LARGE_FONT)
-		label.grid(column  = 0, row = 0)
+		basicLabel(self, 'Categoria', LARGE_FONT, [0,0])
 
-		entry = ttk.Entry(self)
-		entry.grid(column  = 1, row = 0)
+		entry = basicEntry(self, [1,0])
 
-		buttonBook = ttk.Button(self, text = "Procurar gênero", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "C.CATEGORIA", like = entry.get(), tabela = "CATEGORIA"))
-		buttonBook.grid(column = 0, row = 7)	
+		nameList = ["Procurar categoria", "Ver todos", "Alterar cadastro", "Deletar", "Cadastrar"]
+		gridList = [[0,7], [1,7], [2,7], [3,7], [4,7]]
+		commandList = [lambda: cmd_search_all(listbox = listbox, 
+								where = "C.CATEGORIA", like = entry.get(), tabela = "CATEGORIA"), 
+						lambda: cmd_search_all(listbox = listbox, 
+								where = "C.CATEGORIA", like = "", tabela = "CATEGORIA"), 
+						lambda: cmd_update_one(listbox = listbox,
+								alteracao = entry.get(), tabela = "CATEGORIA"), 
+						lambda: cmd_delete(listbox = listbox, entries = None,
+								tabela = "CATEGORIA", param_id = "IDCATEGORIA", param = "CATEGORIA"), 
+						lambda: cmd_add(listbox  = listbox, nome = entry.get().upper(), table = "CATEGORIA")]
 
-		buttonAll = ttk.Button(self, text = "Ver todos", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "C.CATEGORIA", like = "", tabela = "CATEGORIA"))
-		buttonAll.grid(column = 1, row = 7)
+		widthList = [0, 0, 0, 0, 0]
+		stickyList = [None, None, None, None, None]
 
-		buttonUpdate = ttk.Button(self, text = "Alterar cadastro", 
-								command = lambda: cmd_update_one(listbox = listbox,
-								alteracao = entry.get(), tabela = "CATEGORIA"))
-		buttonUpdate.grid(column = 2, row = 7)
+		manyButtons(self, "searchAuthor", nameList, gridList, commandList, widthList, stickyList)
 
-		buttonDelete = ttk.Button(self, text = "Deletar", 
-								command = lambda: cmd_delete(listbox = listbox,
-								tabela = "CATEGORIA", param_id = "IDCATEGORIA", param = "CATEGORIA"))
-		buttonDelete.grid(column = 3, row = 7)
+		columnName = ()
+		columnName = ('id','Categoria', 'Nome', 'AutorAutor')
+		text = ['ID Livro', 'Categoria', 'Nome', 'Autor']
 
-		buttonAdd = ttk.Button(self, text = "Adiciona Gênero", 
-								command = lambda: cmd_add(listbox  = listbox, nome = entry.get().upper(), table = "CATEGORIA"))
-		buttonAdd.grid(column = 4, row = 7)
+		listbox = basicListboxScroll(self, [0,4], [6,3], [6,4], 3, columnName, text)
 
-		listbox = ttk.Treeview(self)
-		listbox.grid(row=4,column=0,rowspan=3,columnspan=100,sticky=tk.W+tk.E+tk.N+tk.S)
-
-		listbox['columns'] = ('id','Categoria', 'Livro', 'Autor')
-
-		listbox.heading("#0", text='Id')
-		listbox.column("#0", stretch=tk.NO, width=0)
-
-		listbox.heading("id", text='ID Categoria')
-		listbox.column("id", stretch=tk.NO, width=100)
-
-		listbox.heading('Categoria', text='Categoria')
-		listbox.column("Categoria", stretch=tk.NO, width=140)
-
-		listbox.heading('Livro', text='Nome do livro')
-		listbox.column("Livro", stretch=tk.NO, width=300)
-
-		listbox.heading('Autor', text='Autor')
-		listbox.column("Autor", stretch=tk.NO, width=120)
-
-		scroll = ttk.Scrollbar(self)
-		scroll.grid(row=4,column=101,rowspan=3, sticky=tk.N+tk.S)
-
-		listbox.configure(yscrollcommand=scroll.set)
-		scroll.configure(command=listbox.yview)
-		
 class searchMidia(tk.Frame):
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
 		
-		buttonAll = ttk.Button(self, text = "Search All Midia", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "T.TIPO", like = "", tabela = "TIPO"))
-		buttonAll.grid(column = 0, row = 0)
+		nameList = ["Procurar tudo", "Procurar E-book", "Procurar Audiobook", "Procurar Físico"]
+		gridList = [[0,0], [1,0], [2,0], [3,0]]
+		commandList = [lambda: cmd_search_all(listbox = listbox, 
+								where = "T.TIPO", like = "", tabela = "TIPO"), 
+						lambda: cmd_search_all(listbox = listbox, 
+								where = "T.TIPO", like = "EBOOK", tabela = "TIPO"), 
+						lambda: cmd_search_all(listbox = listbox, 
+									where = "T.TIPO", like = "AUDIOBOOK", tabela = "TIPO"), 
+						lambda: cmd_search_all(listbox = listbox, 
+								where = "T.TIPO", like = "FISICO", tabela = "TIPO")]
 
-		buttonEbook = ttk.Button(self, text = "Search E-book", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "T.TIPO", like = "EBOOK", tabela = "TIPO"))
-		buttonEbook.grid(column = 1, row = 0)	
+		widthList = [0, 0, 0, 0, 0]
+		stickyList = [None, None, None, None, None]
 
-		buttonAudiobook = ttk.Button(self, text = "Search Audiobook", 
-									command = lambda: cmd_search_all(listbox = listbox, 
-									where = "T.TIPO", like = "AUDIOBOOK", tabela = "TIPO"))
-		buttonAudiobook.grid(column = 2, row = 0)	
+		manyButtons(self, "Procurar E-book", nameList, gridList, commandList, widthList, stickyList)
 
-		buttonBook = ttk.Button(self, text = "Search Book", 
-								command = lambda: cmd_search_all(listbox = listbox, 
-								where = "T.TIPO", like = "FISICO", tabela = "TIPO"))
-		buttonBook.grid(column = 3, row = 0)
+		columnName = ()
+		columnName = ('id','Nome', 'Autor', 'Genero')
+		text = ['id','Nome', 'Autor', 'Genero']
 
-		listbox = ttk.Treeview(self)
-		listbox.grid(row=4,column=0,rowspan=3,columnspan=100,sticky=tk.W+tk.E+tk.N+tk.S)
-
-		listbox['columns'] = ('id','Nome', 'Autor', 'Genero')#, 'Tipo', 'Quantidade')
-
-		listbox.heading("#0", text='Id')
-		listbox.column("#0", stretch=tk.NO, width=0)
-
-		listbox.heading("id", text='ID Livro')
-		listbox.column("id", stretch=tk.NO, width=70)
-
-		listbox.heading('Nome', text='Nome do livro')
-		listbox.column("Nome", stretch=tk.NO, width=300)
-
-		listbox.heading('Autor', text='Autor')
-		listbox.column("Autor", stretch=tk.NO, width=120)
-
-		listbox.heading('Genero', text='Gênero')
-		listbox.column("Genero", stretch=tk.NO, width=120)
-
-		scroll = ttk.Scrollbar(self)
-		scroll.grid(row=4,column=101,rowspan=3, sticky=tk.N+tk.S)
-
-		listbox.configure(yscrollcommand=scroll.set)
-		scroll.configure(command=listbox.yview)
-
+		listbox = basicListboxScroll(self, [0,4], [6,3], [6,4], 3, columnName, text)
 
 if __name__ == "__main__":
 	app = mainApp()

@@ -12,8 +12,17 @@ def popupmsg(msg):
 	button1.pack()
 	popup.mainloop()
 
+# São necessárias cinco operações:
+# 1. inserir dados
+# 2. atualizar dados
+# 3. buscar dados
+# 4. deletar dados
+# 5. ligar as tabelas associativas
+
 class Database:
 
+	# cria a conexão inicial com o DB e cria um cursor para
+	# executar as querries
 	def __init__(self):
 		self.connection = mysql.connector.connect(user='root', password = '1234', host = '127.0.0.1', 
 											database = 'biblioteca')
@@ -24,6 +33,8 @@ class Database:
 	# já que são três listboxes diferentes que podem ser preenchidas, dependendo de
 	# onde foi invocada a querry
 
+	# função para buscar as capas dos livros e mostrar quando clicar no lisbox
+	# com os dados desejados
 	def search_cover(self, name):
 
 		self.cursor.execute("""SELECT IFNULL(L.CAPA, "Sem informação")
@@ -36,17 +47,12 @@ class Database:
 		return cover
 
 
+	# função nº 3: buscar dados
 	def search(self, where, like, tabela):
 
-		# invocada pela pesquisa de livros e tipo de mídia
+		# caso seja invocado pela aba de livros ou tipo de mídia
+		# ambas possuem a mesma estrutura de listbox
 		if tabela == "LIVRO" or tabela == "TIPO" :
-			# self.cursor.execute("""SELECT IFNULL(L.CAPA, "Sem informação"), 
-			# 					FROM LIVRO L 
-			# 					WHERE %s LIKE %s """ 
-			# 					%(where , "\"" + "%" +like+ "%" + "\""))
-			# photo = self.cursor.fetchall()
-
-
 			self.cursor.execute("""SELECT IFNULL(L.IDLIVRO, "Sem informação"), 
 									 IFNULL(L.NOME, "Sem informação"), 
 									 IFNULL(A.NOME, "Sem informação"), 
@@ -99,16 +105,17 @@ class Database:
 								WHERE %s LIKE %s 
 								ORDER BY C.IDCATEGORIA """
 								%(where , "\"" + "%" +like+ "%" + "\""))
+		
 		# retorna os dados a serem mostrados após pesquisa
 		data = self.cursor.fetchall()
 
-		return data#, photo
+		return data
 
-	# Função responsável por linkar as tabelas associativas do BD:
+	# Função nº 5: responsável por linkar as tabelas associativas do BD:
 	# Livro -> Livro_Tipo <- Tipo
 	# Livro -> Livro_Catagoria <- Categoria
 	# Livro -> Autoria <- Autor
-	# Sua invocação se dá no cadastro de um novo livro, em que todos
+	# Sua invocação se dá no apenas cadastro de um novo livro, em que todos
 	# os dados necessários são fornecidos
 	def link_all(self, nomeLivro, nomeAutor, nomeTipo, nomeGenero):
 
@@ -137,43 +144,45 @@ class Database:
 							)""" %(nomeLivro, nomeGenero))
 		self.connection.commit()
 
-	def link_one(self, tabelaAssoc, 
-				 idA, tabelaA, paramA, valueA,
-				 idB, tabelaB, paramB, valueB):
-
-		return self.cursor.execute("""INSERT IGNORE INTO %s VALUES(NULL,
-							(SELECT %s FROM %s
-							WHERE %s.%s = "%s"),
-							(SELECT %s FROM %s 
-							WHERE %s.%s = "%s")
-							)""" %(tabelaAssoc, 
-								idA, tabelaA, tabelaA, paramA, valueA,
-							  	idB, tabelaB, tabelaB, paramB, valueB))
-
-
+	# Função nº 1: inserção de valores. Diversas podem ser as fontes de invocação
+	# cada uma foi tratada como uma possibilidade dentro o "if"
 	def insert(self, values, table):
 
+		# se tentamos inserir um livro
 		if table == "LIVRO":
 		# A posição das entradas no parâmetro values é: 
 		#                nome, autor, genero, midia, qdade, lido, tenho, capa
 			try:
+				# caso a quantidade não seja informada, passa-se um
+				# valor default igual a 1
+				if values[4] == "":
+					values[4] = "1"
+
+				# coloca todas as capas como a img "SEM-CAPA" no início
+				# if values[7] == "":
+				# 	values[7] = r".\capas\SEM-IMAGEM.jpg"
+				# print
+
 				self.cursor.execute("""INSERT INTO LIVRO(IDLIVRO, NOME, CAPA, QUANTIDADE, LIDO, POSSUO, ID_EMPRESTIMO) 
 								VALUES (NULL,"%s","%s","%s","%s","%s",NULL) """ 
 								%(values[0], 
-									values[7], 
-									int(values[4]), 
+								values[7], 
+								int(values[4]), 
 								values[5], 
 								values[6]))
 
+				# já executamos as querries de autor e categoria, caso eles ainda não estejam
+				# cadastrados
 				self.cursor.execute("""INSERT IGNORE INTO AUTOR(IDAUTOR, NOME) VALUES (NULL,"%s")""" %(values[1]))
 
 				self.cursor.execute("""INSERT IGNORE INTO TIPO(IDTIPO, TIPO) VALUES (NULL,"%s")""" %(values[3]))			
 
 				self.cursor.execute("""INSERT IGNORE INTO CATEGORIA(IDCATEGORIA, CATEGORIA) VALUES (NULL,"%s")""" 
 								%(values[2]))
-		
 
 				self.connection.commit()
+
+				# fazemos o link das tabelas associativas necessárias
 				self.link_all(values[0], values[1], values[3], values[2])
 				
 			# Caso o livro já tenha sido cadastrado, levanta o erro de chave duplicada
@@ -181,18 +190,23 @@ class Database:
 			except mysql.connector.errors.IntegrityError as e:
 				popupmsg("Livro já cadastrado!")
 			# O valor do campo quantidade DEVE ser um inteiro
-			except ValueError as e:
-				popupmsg("Quantidade deve ser um número inteiro!")
+			# except ValueError as e:
+			# 	popupmsg("Quantidade deve ser um número inteiro!")
 
+		# se a inserção for apenas de um novo autor/categoria
 		elif table == "AUTOR" or table == "CATEGORIA":
 			try:
 				self.cursor.execute("""INSERT INTO %s VALUES (NULL,"%s")""" 
 								%(table, values[0]))
 				self.connection.commit()			
 
+			# caso o novo cadastro já exista
 			except mysql.connector.errors.IntegrityError as e:
 				popupmsg("O cadastro já existe!")
 
+	# Função nº 2: atualizar os dados. A função mais complicada até então
+	# pois envolve uma variedade de tabelas e ligações associativas para
+	# se alterar
 	def update(self, index, nome_livro, nome_autor, genero, midia, quantidade, 
 				combo_lido, combo_tenho, path_capa):
 
@@ -201,17 +215,25 @@ class Database:
 		midia_old = index[2]
 		genero_old = index[3]
 
-		# ----------------------- ATUALIZA LIVRO ------------------------
+		# como o padrão do DB é retornar "Sem informação" para alguma querry de busca que
+		# não retorne tupla, criou-se esse erro para tratar desses eventos que causam problemas
+		# na hora de receber os dados clicados na listbox
 		class ErroSemInfo(Exception):
 			def __init__(self, msg):
 				print(msg)
+		# ----------------------- ATUALIZA LIVRO ------------------------
+
 		try:
-			self.cursor.execute("""UPDATE LIVRO #(IDLIVRO, NOME, CAPA, QUANTIDADE, LIDO, POSSUO, ID_EMPRESTIMO) 
-							SET NOME = "%s", CAPA = "%s", QUANTIDADE = "%s",
-							LIDO = "%s", POSSUO = "%s", ID_EMPRESTIMO = NULL
-							WHERE IDLIVRO = %s""" 
-							%(nome_livro, path_capa, int(quantidade), 
-							combo_lido, combo_tenho, int(index_livro_old)))
+			self.cursor.execute("""UPDATE LIVRO 
+									SET NOME = "%s", 
+									CAPA = "%s",
+									QUANTIDADE = "%s",
+									LIDO = "%s", 
+									POSSUO = "%s", 
+									ID_EMPRESTIMO = NULL
+									WHERE IDLIVRO = %s""" 
+									%(nome_livro, path_capa, int(quantidade), 
+									  combo_lido, combo_tenho, int(index_livro_old)))
 		
 		except mysql.connector.errors.IntegrityError as e:
 			popupmsg("Livro já cadastrado!")
@@ -220,27 +242,29 @@ class Database:
 
 		# ----------------------- ATUALIZA AUTOR ------------------------
 		try:
+			# caso a operação troque um autor já cadastrado por um novo, p.e., nome errado
 			self.cursor.execute("""SELECT IDAUTOR FROM AUTOR WHERE NOME = "%s" """
-							%(autor_old))
+									%(autor_old))
 
 			# recupera o id do velho autor
 			index_autor_old = self.cursor.fetchall()
-			# print(index_autor_old)
 
-			# o id vem numa tupla que está dentro de uma lis, então, para recuperar
-			# seu valor, é preciso acessar a posção 0 da tupla que está na posição
+			# o id vem numa tupla que está dentro de uma list, então, para recuperar
+			# seu valor, é preciso acessar a posição 0 da tupla que está na posição
 			# 0 da list
 			index_autor_old = index_autor_old[0][0]
-			# print(index_autor_old)
 			
+			# caso estejamos pegando um autor já cadastrado e apontando-o para 
+			# uma associação
 			self.cursor.execute("""SELECT IDAUTOR FROM AUTOR WHERE NOME = "%s" """
 							%(nome_autor))
 			try:
 				index_autor_new = self.cursor.fetchall()
 				index_autor_new = index_autor_new[0][0]
 			except IndexError as err:
-				popupmsg("Por favor, cadastrar a novo autor antes de alterá-lo!")
+				popupmsg("Por favor, cadastrar o novo autor antes de alterá-lo!")
 			
+			# como citado, o retorno "Sem informação" foi tratado com esse erro
 			if autor_old == "Sem informação":
 				raise ErroSemInfo("autor sem info")
 		
@@ -253,20 +277,19 @@ class Database:
 							SET A.NOME = "%s"
 							WHERE AU.ID_AUTOR = "%s" AND AU.ID_LIVRO = "%s" """
 							%(nome_autor, int(index_autor_old), int(index_livro_old)))
-		except (mysql.connector.errors.IntegrityError, IndexError) as err:
-			 # caso seja modificado para um autor que já está cadastrado corretamente, 
-			 # apenas muda-se a associação na tabela autoria
-
+		
+		except (mysql.connector.errors.IntegrityError, IndexError) as err:		
+			# caso seja modificado para um autor que já está cadastrado corretamente, 
+			# apenas muda-se a associação na tabela autoria
 			self.cursor.execute("""UPDATE AUTORIA AU
 							SET AU.ID_AUTOR = "%s"
 							WHERE AU.ID_AUTOR = "%s" AND AU.ID_LIVRO = "%s" """
 							%(int(index_autor_new), int(index_autor_old), int(index_livro_old)))
+		
 		except ErroSemInfo as err:
-
-			print("""INSERT IGNORE AUTORIA AU 
-									VALUES (NULL, "%s", "%s")"""
-									%(int(index_livro_old), int(index_autor_new)))
-
+			# caso a listbox nos retorne um livro com autor "Sem informação" e a alteração 
+			# seja colocar um autor já cadastrado nesse livro, o que faz-se apenas é criar
+			# a ligação associativa entre livro e autor, pois ambos já estão cadastrados
 			self.cursor.execute("""INSERT IGNORE INTO AUTORIA 
 									VALUES (NULL, "%s", "%s")"""
 									%(int(index_livro_old), int(index_autor_new)))
@@ -295,12 +318,8 @@ class Database:
 			self.cursor.execute("""SELECT IDCATEGORIA FROM CATEGORIA WHERE CATEGORIA = "%s" """
 							%(genero_old))
 
-			# recupera o id do velho autor
 			index_genero_old = self.cursor.fetchall()
 
-			# o id vem numa tupla que está dentro de uma lis, então, para recuperar
-			# seu valor, é preciso acessar a posção 0 da tupla que está na posição
-			# 0 da list
 			index_genero_old = index_genero_old[0][0]
 
 			self.cursor.execute("""SELECT IDCATEGORIA FROM CATEGORIA WHERE CATEGORIA = "%s" """
@@ -314,8 +333,6 @@ class Database:
 			if genero_old == "Sem informação":
 				raise ErroSemInfo("autor sem info")
 			
-
-				# caso o autor esteja com o nome errado apenas
 			self.cursor.execute("""UPDATE CATEGORIA C
 							INNER JOIN LIVRO_CATEGORIA LC 
 							ON C.IDCATEGORIA = LC.ID_CATEGORIA
@@ -326,14 +343,6 @@ class Database:
 							%(genero, int(index_genero_old), int(index_livro_old)))
 			
 		except (mysql.connector.errors.IntegrityError, IndexError) as err:
-				 # caso seja modificado para um autor que já está cadastrado corretamente, 
-				 # apenas muda-se a associação na tabela autoria
-				# self.cursor.execute("""SELECT IDCATEGORIA FROM CATEGORIA WHERE CATEGORIA = "%s" """
-				# 				%(genero))
-
-				# index_genero_new = self.cursor.fetchall()
-
-				# index_genero_new = index_genero_new[0][0]
 
 				self.cursor.execute("""UPDATE LIVRO_CATEGORIA
 								SET ID_CATEGORIA = "%s"
@@ -346,6 +355,7 @@ class Database:
 		
 		self.connection.commit()
 
+	# continuação da Função nº 2, mas complementado com a Função nº 5
 	def update_one(self, old, alteracao, tabela):
 
 		class ErroSemInfo(Exception):
@@ -376,14 +386,9 @@ class Database:
 			# tentamos alterar o um regsitro que já exite, p.e. escrevemos errado no cadastro
 			# ou seja, apenas vamos atualizar um valor já existente na tabela
 
-			# print("apenas atualizando um valor na table")
-
 			index_old = old[0] # indice dos dados que serão modificados
 			dado_old = old[1] # nome do dado a ser modificado
 			livro_old = old[2] # nome do livro que terá seus dados modificados
-			# print(index_old)
-			# print(dado_old)
-			# print(livro_old)
 
 			self.cursor.execute("""SELECT IDLIVRO FROM LIVRO WHERE NOME = "%s" """
 							%(livro_old))
@@ -401,34 +406,19 @@ class Database:
 				raise ErroSemInfo("Sem informação")
 			else:
 				self.cursor.execute("""UPDATE %s %s
-				 				INNER JOIN %s %s
-				 				ON %s = %s
-				 				INNER JOIN LIVRO L 
-				 				ON  %s = L.IDLIVRO
-				 				SET  %s = "%s"
-				 				WHERE  %s = "%s" AND  %s = "%s" """
-				 				%(tabela, letraUpdate, tabelaAssoc, letraAssoc, idUpdate, idAssoc, idLivro, paramUpdate,
-				 				 str(alteracao), idAssoc, int(index_old), idLivro, int(index_livro_old)))
-			# print("""UPDATE AUTOR A
-			# 		INNER JOIN %s
-			# 		ON %s = %s
-			# 		INNER JOIN LIVRO L 
-			# 		ON %s = L.IDLIVRO
-			# 		SET A.NOME = "%s"
-			# 		WHERE %s = "%s" AND %s = "%s" """
-			# 		%(#tabelaUpdate,
-			# 		 tabelaAssoc, idUpdate, idAssoc, idLivro,# paramUpdate,
-			# 		str(alteracao), idAssoc, int(index_old), idLivro, int(index_livro_old)))
+						 				INNER JOIN %s %s
+						 				ON %s = %s
+						 				INNER JOIN LIVRO L 
+						 				ON  %s = L.IDLIVRO
+						 				SET  %s = "%s"
+						 				WHERE  %s = "%s" AND  %s = "%s" """
+						 				%(tabela, letraUpdate, tabelaAssoc, letraAssoc, idUpdate, idAssoc, idLivro, paramUpdate,
+						 				 str(alteracao), idAssoc, int(index_old), idLivro, int(index_livro_old)))
 
 		except mysql.connector.errors.IntegrityError as err:
 			 # caso seja modificado para um autor que já está cadastrado corretamente, 
 			 # apenas muda-se a associação na tabela autoria, mantendo-se os dois, ou seja
 			 # uma troca de valores nas associações
-
-			# print("\nAqui está havendo uma troca de associações\n")
-			# print("""SELECT %s FROM %s %s WHERE %s = "%s" """
-			# 				%(idUpdate, tabelaUpdate, letraUpdate, paramUpdate, str(alteracao)))
-
 			self.cursor.execute("""SELECT %s FROM %s %s WHERE %s = "%s" """
 							%(idUpdate, tabelaUpdate, letraUpdate, paramUpdate, str(alteracao)))
 
@@ -446,12 +436,8 @@ class Database:
 
 			try:
 				# nesse caso, o valor está apenas na tabela, mas não tem associações, ou seja,
-				# está marcado como Sem informação no nome do livro. Isso acontece quanto temos
+				# está marcado como "Sem informação" no nome do livro. Isso acontece quanto temos
 				# um cadastro de autor e/ou gênero, mas nenhum livro daquele autor e/ou gênero
-				# print("\nCampo do nome do livro marcado como Sem informação\n")
-				# print("""SELECT %s FROM %s %s WHERE %s = "%s" """
-				# 				%(idUpdate, tabelaUpdate, letraUpdate, paramUpdate, dado_old))
-
 				self.cursor.execute("""SELECT %s FROM %s %s WHERE %s = "%s" """
 								%(idUpdate, tabelaUpdate, letraUpdate, paramUpdate, dado_old))
 
@@ -464,8 +450,10 @@ class Database:
 								WHERE %s = "%s" """
 								%(tabelaUpdate, letraUpdate, paramUpdate, 
 								str(alteracao), idUpdate, int(index_autor_new)))
+			
 			except mysql.connector.errors.IntegrityError as err:
 				popupmsg("Entrada já cadastrada!")
+			
 			except IndexError as err:
 				popupmsg("Por favor, entrar com o dado que deseja substituir!")
 
